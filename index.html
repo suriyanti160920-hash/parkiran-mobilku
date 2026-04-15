@@ -249,6 +249,10 @@
   <div class="box total" id="totalBox">Total 0</div>
   <div class="box masuk" id="masukBox">Masuk 0</div>
   <div class="box keluar" id="keluarBox">Keluar 0</div>
+
+  <div class="box total" id="visitorBox" style="display:none;">
+    Visitor 0
+  </div>
 </div>
 
 <button class="btn-filter" onclick="filterMasuk()">Tampilkan Masuk</button>
@@ -304,6 +308,44 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const ref = collection(db,"parkir");
+const visitorRef = collection(db,"visitors");
+
+/* DEVICE INFO */
+function getDeviceInfo(){
+  const ua = navigator.userAgent;
+
+  if(ua.includes("Android")) return "Android 📱";
+  if(ua.includes("iPhone")) return "iPhone 🍎";
+  if(ua.includes("Windows")) return "Windows 💻";
+  if(ua.includes("Mac")) return "Mac 🍏";
+
+  return "Unknown Device";
+}
+
+/* VISITOR LOG */
+let todayKey = "visit_" + new Date().toDateString();
+
+if(!localStorage.getItem(todayKey)){
+
+  addDoc(visitorRef,{
+    device: getDeviceInfo(),
+    userAgent: navigator.userAgent,
+    time: Date.now(),
+    page: "parkir-app"
+  });
+
+  localStorage.setItem(todayKey,"1");
+}
+
+/* REALTIME COUNT */
+onSnapshot(visitorRef,(snap)=>{
+  const totalVisitor = snap.size;
+
+  const box = document.getElementById("visitorBox");
+  if(box){
+    box.innerText = "Visitor " + totalVisitor;
+  }
+});
 
 let isAdmin=false;
 let allData=[];
@@ -382,10 +424,12 @@ window.loginAdmin=function(){
     adminForm.style.display="block";
     alert("Login berhasil sebagai ADMIN ✅");
     render();
+    document.getElementById("visitorBox").style.display = "block";
   } else if(pass!==null){
     isAdmin=false;
     adminForm.style.display="none";
     alert("Password salah ❌");
+    document.getElementById("visitorBox").style.display = "none";
   }
 };
 
@@ -754,4 +798,4 @@ imgFull.addEventListener("wheel", (e)=>{
 </script>
 
 </body>
-</html>
+  </html>
