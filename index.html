@@ -17,7 +17,17 @@
       color:#fff;
     }
 
-    h2{text-align:center;}
+    h2{
+  text-align:center;
+  font-size:22px;
+  font-weight:bold;
+  margin-bottom:15px;
+  padding:10px;
+  border-radius:12px;
+  background:linear-gradient(135deg,#2c3e50,#4ca1af);
+  box-shadow:0 6px 20px rgba(0,0,0,0.4);
+  letter-spacing:1px;
+}
 
     .dashboard{
       display:flex;
@@ -269,6 +279,7 @@
   <div id="errKamar" class="error-text"></div>
 
   <input id="plat" placeholder="Plat">
+  <input id="plat2" placeholder="Plat Mobil 2 (opsional)">
   <div id="errPlat" class="error-text"></div>
 
   <input id="posisi" placeholder="Posisi">
@@ -465,12 +476,19 @@ window.addData = async function(){
   await addDoc(ref,{
   nama:nama.value.toUpperCase(),
   kamar:kamar.value,
-  plat:plat.value.toUpperCase(),
+
+  plat:[
+    plat.value.toUpperCase(),
+    plat2.value.toUpperCase()
+  ],
+
   posisi:posisi.value,
+
   foto:[
   foto1.value,
-  foto2.value
+  foto2.value || ""
 ],
+
   status:"Masuk",
   waktuMasuk:Date.now(),
   warning:false
@@ -539,53 +557,90 @@ function render(){
       (d.kamar||"")
     ).toLowerCase().includes(searchValue);
   })
-  .forEach(d=>{
+.filter(d=>{
+  if(mode==="masuk" && d.status!=="Masuk") return false;
+  if(mode==="keluar" && d.status!=="Keluar") return false;
 
-    if(d.status==="Masuk") masuk++; else keluar++;
+  return (
+    (d.nama||"") +
+    (d.plat||"") +
+    (d.kamar||"")
+  ).toLowerCase().includes(searchValue);
+})
+.forEach(d=>{
 
-    list.innerHTML+=`
-      <div class="card">
+  if(d.status==="Masuk") masuk++; else keluar++;
 
-        <div class="field nama">Nama : ${d.nama||"-"}</div>
-        <div class="field kamar">Kamar : ${d.kamar||"-"}</div>
-        <div class="field posisi">Posisi : ${d.posisi||"-"}</div>
-        <div class="field plat">Plat : ${d.plat||"-"}</div>
+  list.innerHTML+=`
+    <div class="card">
+    <div style="margin-bottom:8px;">
+  <b>Status :</b>
+  <span class="${d.status==="Masuk"?"status-masuk":"status-keluar"}">
+    ${d.status}
+  </span>
+</div>
 
-        <b>Status :</b>
-        <span class="${d.status==="Masuk"?"status-masuk":"status-keluar"}">
-          ${d.status}
-        </span>
-${d.status==="Masuk"?`<div class="countdown">⏳ ${getCountdown()}</div>`:""}
-${d.warning?`<div style="color:#f1c40f;font-size:12px;">⚠️ Segera Checkout</div>`:""}
-        ${Array.isArray(d.foto) 
-  ? d.foto.map((f,i) => f ? `<div>Mobil ${i+1}</div><img src="${f}" onclick="openImg('${f}')">` : "").join("")
-  : d.foto 
-    ? `<div>Mobil 1</div><img src="${d.foto}" onclick="openImg('${d.foto}')">`
-    : ""
+      <div class="field nama">Nama : ${d.nama||"-"}</div>
+      <div class="field kamar">Kamar : ${d.kamar||"-"}</div>
+      <div class="field posisi">Posisi : ${d.posisi||"-"}</div>
+      
+      ${
+  Array.isArray(d.foto)
+  ? d.foto.map((f,i)=>{
+
+      if(!f) return "";
+
+      const plat = Array.isArray(d.plat) ? d.plat[i] || "-" : d.plat || "-";
+
+      return `
+        <div style="margin-top:10px;">
+
+          <div class="field plat">
+           Nomor Plat ${i+1} : ${plat}
+          </div>
+${d.status==="Masuk"
+  ? `<div class="countdown">⏳ ${getCountdown()}</div>`
+  : ""
+}
+          <img src="${f}" onclick="openImg('${f}')">
+
+        </div>
+      `;
+  }).join("")
+  : ""
 }
 
-        ${(mode!=="keluar" && d.status==="Masuk")?`
-        <button class="btn-checkout" onclick="checkout('${d.id}')">CHECK OUT</button>`:""}
+      ${d.warning
+        ? `<div style="color:#f1c40f;font-size:12px;">⚠️ Segera Checkout</div>`
+        : ""
+      }
 
-        ${(mode==="keluar")?`
-        <button class="btn-hapus" onclick="hapus('${d.id}')">HAPUS</button>`:""}
+      ${(mode!=="keluar" && d.status==="Masuk")
+        ? `<button class="btn-checkout" onclick="checkout('${d.id}')">CHECK OUT</button>`
+        : ""
+      }
 
-        ${isAdmin ? `
-<button class="btn-edit"
-onclick='editData(
-"${d.id}",
-"${d.nama}",
-"${d.plat}",
-"${d.kamar}",
-"${d.posisi}",
-${JSON.stringify(d.foto || [])}
-)'>
-EDIT</button>
-` : ""}
+      ${(mode==="keluar")
+        ? `<button class="btn-hapus" onclick="hapus('${d.id}')">HAPUS</button>`
+        : ""
+      }
 
-      </div>
-    `;
-  });
+      ${isAdmin ? `
+        <button class="btn-edit"
+        onclick='editData(
+        "${d.id}",
+        "${d.nama}",
+        "${d.plat}",
+        "${d.kamar}",
+        "${d.posisi}",
+        ${JSON.stringify(d.foto || [])}
+        )'>
+        EDIT</button>
+      ` : ""}
+
+    </div>
+  `;
+});
 
   totalBox.innerText="Total "+total;
   masukBox.innerText="Masuk "+masuk;
@@ -593,6 +648,26 @@ EDIT</button>
 }
 
 /* CHECKOUT */
+window.checkoutMobil = async function(id,index){
+
+  const data = allData.find(d=>d.id===id);
+  if(!data) return;
+
+  data.mobil[index].status = "Keluar";
+
+  await updateDoc(doc(db,"parkir",id),{
+    mobil: data.mobil
+  });
+const semuaKeluar = data.mobil.every(m=>m.status==="Keluar");
+
+if(semuaKeluar){
+  await updateDoc(doc(db,"parkir",id),{
+    status:"Keluar",
+    waktuKeluar:Date.now()
+  });
+}
+
+};
 window.checkout=id=>{
   if(confirm("Yakin keluar?")){
     updateDoc(doc(db,"parkir",id),{
@@ -824,4 +899,4 @@ imgFull.addEventListener("wheel", (e)=>{
 </script>
 
 </body>
-  </html>
+    </html>
