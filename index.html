@@ -274,7 +274,8 @@
   <input id="posisi" placeholder="Posisi">
   <div id="errPosisi" class="error-text"></div>
 
-  <input id="foto" placeholder="Link Foto (URL)">
+  <input id="foto1" placeholder="Link Foto Mobil 1">
+<input id="foto2" placeholder="Link Foto Mobil 2 (opsional)">
   <div id="errFoto" class="error-text"></div>
 
   <button class="btn-main" onclick="addData()">+ TAMBAH</button>
@@ -443,7 +444,7 @@ window.addData = async function(){
     {el:kamar, err:errKamar, msg:"Kamar wajib diisi"},
     {el:plat, err:errPlat, msg:"Plat wajib diisi"},
     {el:posisi, err:errPosisi, msg:"Posisi wajib diisi"},
-    {el:foto, err:errFoto, msg:"Link foto wajib diisi"}
+    {el:foto1, err:errFoto, msg:"Foto mobil 1 wajib diisi"}
   ];
 
   fields.forEach(f=>{
@@ -466,7 +467,10 @@ window.addData = async function(){
   kamar:kamar.value,
   plat:plat.value.toUpperCase(),
   posisi:posisi.value,
-  foto:foto.value,
+  foto:[
+  foto1.value,
+  foto2.value
+],
   status:"Masuk",
   waktuMasuk:Date.now(),
   warning:false
@@ -476,7 +480,8 @@ window.addData = async function(){
   kamar.value="";
   plat.value="";
   posisi.value="";
-  foto.value="";
+  foto1.value="";
+foto2.value="";
 };
 
 /* SEARCH */
@@ -552,7 +557,12 @@ function render(){
         </span>
 ${d.status==="Masuk"?`<div class="countdown">⏳ ${getCountdown()}</div>`:""}
 ${d.warning?`<div style="color:#f1c40f;font-size:12px;">⚠️ Segera Checkout</div>`:""}
-        ${d.foto?`<img src="${d.foto}" onclick="openImg('${d.foto}')">`:""}
+        ${Array.isArray(d.foto) 
+  ? d.foto.map((f,i) => f ? `<div>Mobil ${i+1}</div><img src="${f}" onclick="openImg('${f}')">` : "").join("")
+  : d.foto 
+    ? `<div>Mobil 1</div><img src="${d.foto}" onclick="openImg('${d.foto}')">`
+    : ""
+}
 
         ${(mode!=="keluar" && d.status==="Masuk")?`
         <button class="btn-checkout" onclick="checkout('${d.id}')">CHECK OUT</button>`:""}
@@ -560,9 +570,18 @@ ${d.warning?`<div style="color:#f1c40f;font-size:12px;">⚠️ Segera Checkout</
         ${(mode==="keluar")?`
         <button class="btn-hapus" onclick="hapus('${d.id}')">HAPUS</button>`:""}
 
-        ${isAdmin?`
-        <button class="btn-edit" onclick="editData('${d.id}','${d.nama}','${d.plat}','${d.kamar}','${d.posisi}','${d.foto}')">
-        EDIT</button>`:""}
+        ${isAdmin ? `
+<button class="btn-edit"
+onclick='editData(
+"${d.id}",
+"${d.nama}",
+"${d.plat}",
+"${d.kamar}",
+"${d.posisi}",
+${JSON.stringify(d.foto || [])}
+)'>
+EDIT</button>
+` : ""}
 
       </div>
     `;
@@ -708,14 +727,21 @@ window.hapus=id=>{
 
 /* EDIT */
 window.editData=async function(id,n,p,k,po,f){
+
   const nn=prompt("Nama",n);
   const pp=prompt("Plat",p);
   const kk=prompt("Kamar",k);
   const ppo=prompt("Posisi",po);
-  const ff=prompt("Foto",f);
+
+  const ff1=prompt("Foto 1", f?.[0] || "");
+  const ff2=prompt("Foto 2", f?.[1] || "");
 
   await updateDoc(doc(db,"parkir",id),{
-    nama:nn,plat:pp,kamar:kk,posisi:ppo,foto:ff
+    nama:nn,
+    plat:pp,
+    kamar:kk,
+    posisi:ppo,
+    foto:[ff1, ff2]
   });
 };
 setInterval(()=>{
