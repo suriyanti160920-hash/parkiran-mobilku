@@ -253,7 +253,10 @@
 
 <h2>🚗 PARKIR MOBIL TAMU</h2>
 
-<button class="btn-login" onclick="loginAdmin()">LOGIN ADMIN</button>
+  
+<button class="btn-login" onclick="loginAdmin()" style="width:350px; height:48px; position:relative; top:-5px; box-shadow:0 4px 10px rgba(0,0,0,0.15);">
+  LOGIN ADMIN
+</button>
 
 <div class="dashboard">
   <div class="box total" id="totalBox">Total 0</div>
@@ -265,10 +268,43 @@
   </div>
 </div>
 
-<button class="btn-filter" onclick="filterMasuk()">Tampilkan Masuk</button>
-<button class="btn-filter" onclick="filterKeluar()">Tampilkan Keluar</button>
-<button class="btn-filter" onclick="filterSemua()">Semua Data</button>
-<button class="btn-main" onclick="exportData()">BACKUP DATA</button>
+<button class="btn-filter" onclick="filterMasuk()" style="width:115px; height:48px;">
+  Masuk
+</button>
+<button class="btn-filter" onclick="filterKeluar()" style="width:115px; height:48px;">
+  Keluar
+</button>
+<button class="btn-filter" onclick="filterSemua()" style="width:115px; height:48px;">
+  Semua
+</button>
+<button class="btn-main" onclick="exportData()" style="width:115px; height:48px;">
+  Backup
+</button>
+<button onclick="ANA.start()" style="
+width:115px;
+height:48px;
+background:#2ecc71;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+margin-top:5px;
+">
+🎤 Start
+</button>
+
+<button onclick="ANA.stop()" style="
+width:115px;
+height:48px;
+background:#e74c3c;
+color:white;
+border:none;
+border-radius:12px;
+font-weight:bold;
+margin-top:5px;
+">
+🛑 Stop
+</button>
 <button class="btn-home" onclick="goHome()">🏠 HOME DASHBOARD</button>
 
 <div id="adminForm">
@@ -896,6 +932,174 @@ imgFull.addEventListener("wheel", (e)=>{
 
   imgFull.style.transform = `scale(${zoom})`;
 });
+  window.ANA = {
+
+  active: false,
+
+  // 🔥 SUARA
+  speak(text){
+    const msg = new SpeechSynthesisUtterance(text);
+    msg.lang = "id-ID";
+    msg.rate = 1;
+    speechSynthesis.speak(msg);
+  },
+
+  // 🔥 START VOICE
+  start(){
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if(!SpeechRecognition){
+      alert("Browser tidak support voice");
+      return;
+    }
+
+    this.active = true;
+
+    const rec = new SpeechRecognition();
+    rec.lang = "id-ID";
+    rec.continuous = false;
+    rec.interimResults = false;
+
+    rec.onresult = (e)=>{
+      let text = e.results[0][0].transcript;
+
+      console.log("🎤 RAW:", text);
+
+      ANA.process(text);
+    };
+
+    rec.onend = ()=>{
+      if(this.active){
+        rec.start();
+      }
+    };
+
+    rec.start();
+
+    this.speak("ANA aktif");
+  },
+
+  stop(){
+    this.active = false;
+    this.speak("ANA dimatikan");
+  },
+
+  // 🔥 NORMALISASI + FIX TYPO
+  normalize(text){
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g," ")
+      .replace(/kmar/g,"kamar")
+      .replace(/keluarin/g,"keluar")
+      .replace(/ckout/g,"checkout")
+      .replace(/ckot/g,"checkout");
+  },
+
+  // 🔥 AMBIL ANGKA (kamar 04 -> 4)
+  extractNumber(text){
+    const match = text.match(/\d+/);
+    return match ? match[0] : "";
+  },
+
+  // 🔥 PROCESS UTAMA
+  process(text){
+
+    text = this.normalize(text);
+
+    console.log("🧠 NORMALIZED:", text);
+
+    let action = "unknown";
+    let target = "";
+
+    // 🔥 CHECKOUT / KELUAR
+    if(
+      text.includes("checkout") ||
+      text.includes("check out") ||
+      text.includes("keluar")
+    ){
+
+      action = "checkout";
+
+      target = text
+        .replace("checkout","")
+        .replace("check out","")
+        .replace("keluar","")
+        .replace("kamar","")
+        .trim();
+    }
+
+    // 🔥 MASUK
+    else if(text.includes("masuk")){
+      action = "masuk";
+      target = text.replace("masuk","").replace("kamar","").trim();
+    }
+
+    console.log("📦 ACTION:", action, "TARGET:", target);
+
+    this.execute(action, target);
+  },
+
+  // 🔥 EKSEKUSI DATA
+  execute(action, target){
+
+    if(action === "checkout"){
+
+      const data = allData.find(d => {
+
+        const nama = (d.nama || "").toLowerCase();
+        const kamar = (d.kamar || "").toLowerCase();
+
+        let t = target.toLowerCase();
+
+        // 🔥 ambil angka kalau ada
+        const num = this.extractNumber(t);
+
+        const matchKamar = num ? kamar.includes(num) : false;
+        const matchNama = nama.includes(t);
+
+        return matchNama || matchKamar;
+      });
+
+      if(!data){
+        this.speak("Data tidak ditemukan");
+        return;
+      }
+
+      updateDoc(doc(db,"parkir",data.id),{
+        status:"Keluar",
+        waktuKeluar:Date.now()
+      });
+
+      this.speak(`Siap, ANA laksanakan checkout ${data.nama} kamar ${data.kamar}`);
+    }
+
+    else if(action === "masuk"){
+
+      const data = allData.find(d => {
+
+        const nama = (d.nama || "").toLowerCase();
+        const kamar = (d.kamar || "").toLowerCase();
+
+        let t = target.toLowerCase();
+        const num = this.extractNumber(t);
+
+        return nama.includes(t) || kamar.includes(num);
+      });
+
+      if(!data){
+        this.speak("Data tidak ditemukan");
+        return;
+      }
+
+      this.speak(`Data masuk ${data.nama} kamar ${data.kamar}`);
+    }
+
+    else {
+      this.speak("Perintah tidak dikenal");
+    }
+  }
+};
 </script>
 
 </body>
