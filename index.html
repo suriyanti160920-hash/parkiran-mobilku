@@ -253,7 +253,6 @@
 
 <h2>🚗 PARKIR MOBIL TAMU</h2>
 
-  
 <button class="btn-login" onclick="loginAdmin()" style="width:350px; height:48px; position:relative; top:-5px; box-shadow:0 4px 10px rgba(0,0,0,0.15);">
   LOGIN ADMIN
 </button>
@@ -306,7 +305,22 @@ margin-top:5px;
 🛑 Stop
 </button>
 <button class="btn-home" onclick="goHome()">🏠 HOME DASHBOARD</button>
+<h3>📢 PENGUMUMAN</h3>
 
+<div id="formPengumuman" style="display:none;">
+  <input id="isiPengumuman" placeholder="Tulis pengumuman...">
+
+  <button onclick="kirimPengumuman()"
+    style="background:#3498db;color:black;padding:6px 10px;border:none;border-radius:6px;">
+    Kirim
+  </button>
+</div>
+
+<audio id="notifSound">
+  <source src="https://www.soundjay.com/buttons/sounds/button-3.mp3">
+</audio>
+
+<div id="listPengumuman"></div>
 <div id="adminForm">
   <input id="nama" placeholder="Nama">
   <div id="errNama" class="error-text"></div>
@@ -327,9 +341,7 @@ margin-top:5px;
 
   <button class="btn-main" onclick="addData()">+ TAMBAH</button>
 </div>
-
 <input id="search" placeholder="Cari...">
-
 <div id="loading">Loading data...</div>
 <div id="judulMode" class="judul-mode"></div>
 <div id="list"></div>
@@ -355,6 +367,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const refPengumuman = collection(db, "pengumuman");
 const ref = collection(db,"parkir");
 const visitorRef = collection(db,"visitors");
 
@@ -470,6 +483,7 @@ window.loginAdmin=function(){
   if(pass==="291995"){
     isAdmin=true;
     adminForm.style.display="block";
+    formPengumuman.style.display = "block";
     alert("Login berhasil sebagai ADMIN ✅");
     render();
     document.getElementById("visitorBox").style.display = "block";
@@ -480,7 +494,53 @@ window.loginAdmin=function(){
     document.getElementById("visitorBox").style.display = "none";
   }
 };
+window.kirimPengumuman = async function () {
 
+  if (!isAdmin){
+    alert("Login dulu sebagai admin ❌");
+    return;
+  }
+
+  const input = document.getElementById("isiPengumuman");
+  const teks = input.value.trim();
+
+  if (!teks){
+    alert("Isi dulu ❗");
+    return;
+  }
+
+  await addDoc(refPengumuman, {
+    isi: teks,
+    waktu: Date.now()
+  });
+
+  input.value = "";
+  alert("Berhasil kirim ✅");
+};
+window.hapusPengumuman = async function(id){
+
+  if(!isAdmin) return;
+
+  if(confirm("Hapus?")){
+    await deleteDoc(doc(db,"pengumuman",id));
+  }
+};
+window.kirimBalasan = async function(id){
+
+  const input = document.getElementById("input-"+id);
+  if(!input) return;
+
+  const teks = input.value.trim();
+  if(!teks) return;
+
+  await addDoc(collection(db,"pengumuman",id,"balasan"),{
+    isi: teks,
+    pengirim: isAdmin ? "Admin" : "User",
+    waktu: Date.now()
+  });
+
+  input.value="";
+};
 /* VALIDASI + ADD */
 window.addData = async function(){
 
@@ -563,7 +623,78 @@ onSnapshot(ref,(snap)=>{
   snap.forEach(d=>allData.push({id:d.id,...d.data()}));
   render();
 });
+onSnapshot(refPengumuman, (snap) => {
 
+  const list = document.getElementById("listPengumuman");
+
+  list.innerHTML = ""; // 🔥 wajib reset dulu
+
+  snap.forEach((docSnap) => {
+
+    const p = docSnap.data();
+    const id = docSnap.id;
+
+    list.innerHTML += `
+      <div style="
+        background:#222;
+        color:white;
+        padding:10px;
+        margin-bottom:10px;
+        border-radius:8px;
+      ">
+
+        <b>📢 Pengumuman</b>
+        <div style="margin-top:5px;">
+          ${p.isi}
+        </div>
+
+        <div id="balasan-${id}" style="margin-top:10px;"></div>
+
+        <input id="input-${id}" placeholder="Balas...">
+
+        <button onclick="kirimBalasan('${id}')"
+          style="background:#3498db;color:black;margin-top:5px;">
+          Kirim
+        </button>
+
+        ${isAdmin ? `
+          <button onclick="hapusPengumuman('${id}')"
+            style="background:red;color:white;margin-top:5px;">
+            Hapus
+          </button>
+        ` : ""}
+
+      </div>
+    `;
+
+    // 🔥 LOAD BALASAN
+    const refBalas = collection(db, "pengumuman", id, "balasan");
+
+    onSnapshot(refBalas, (snapBalas) => {
+
+      let html = "";
+
+      snapBalas.forEach((b) => {
+        const data = b.data();
+
+        html += `
+          <div style="
+            background:#444;
+            margin-top:5px;
+            padding:5px;
+            border-radius:6px;
+          ">
+            <b>${data.pengirim}</b>: ${data.isi}
+          </div>
+        `;
+      });
+
+      document.getElementById("balasan-" + id).innerHTML = html;
+    });
+
+  });
+
+});
 /* RENDER */
 function render(){
 
@@ -818,7 +949,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   img.addEventListener("touchend",()=>{
     isDragging = false;
-    startDist = null;
+    startDist =null;
   });
 
   function getDistance(t1, t2){
@@ -932,7 +1063,7 @@ imgFull.addEventListener("wheel", (e)=>{
 
   imgFull.style.transform = `scale(${zoom})`;
 });
-  window.ANA = {
+window.ANA = {
 
   active: false,
 
@@ -971,7 +1102,7 @@ imgFull.addEventListener("wheel", (e)=>{
     rec.onend = ()=>{
       if(this.active){
         rec.start();
-      }
+}
     };
 
     rec.start();
@@ -1100,6 +1231,19 @@ imgFull.addEventListener("wheel", (e)=>{
     }
   }
 };
+window.addEventListener("load", function () {
+  const urlParams = new URLSearchParams(window.location.search);
+  const text = urlParams.get("text");
+
+  if (text) {
+    const input = document.getElementById("input");
+    if (input) {
+      input.value = text;
+    }
+  }
+});
+  document.addEventListener("touchstart", function(){}, true);
+document.addEventListener("click", function(){}, true);
 </script>
 
 </body>
